@@ -18,7 +18,7 @@ try:
 except ImportError:
     print('please install Python binding of OpenCV to compute EMD')
 
-from utils import normalize, match_hist
+from .utils import normalize, match_hist
 
 
 def AUC_Judd(saliency_map, fixation_map, jitter=True):
@@ -317,3 +317,33 @@ def EMD(saliency_map1, saliency_map2, sub_sample=1/32.0):
     cv.Convert(cv.fromarray(np.c_[map1.ravel(), x.ravel(), y.ravel()]), signature1)
     cv.Convert(cv.fromarray(np.c_[map2.ravel(), x.ravel(), y.ravel()]), signature2)
     return cv.CalcEMD2(signature2, signature1, cv.CV_DIST_L2)
+
+def KLdiv(saliency_map, fixation_map, eps=np.finfo(float).eps):
+    '''
+    This finds the KL-divergence between two different saliency maps when
+    viewed as distributions: it is a non-symmetric measure of the information 
+    lost when saliencyMap is used to estimate fixationMap.
+
+    Parameters
+    ----------
+    saliency_map : real-valued matrix
+        If the two maps are different in shape, saliency_map will be resized to match fixation_map.
+    fixation_map : real-valued matrix
+        Human fixation map
+
+    Returns
+    -------
+    KLdiv : float, positive
+    '''
+    s_map = np.array(saliency_map, copy=False)
+    f_map = np.array(fixation_map, copy=False)
+    if s_map.shape != f_map.shape:
+        s_map = resize(s_map, f_map.shape, order=3, mode='nearest')
+    # Normalize the two maps to have values between [0,1] and sum up to 1
+    s_map = normalize(s_map, method='range')
+    f_map = normalize(f_map, method='range')
+    s_map = normalize(s_map, method='sum')
+    f_map = normalize(f_map, method='sum')
+
+    # compute KL-divergence
+    return np.sum(f_map * np.log(eps + f_map/(s_map+eps)))
